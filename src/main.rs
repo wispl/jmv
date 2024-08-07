@@ -78,7 +78,7 @@ impl RenderData {
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let path = &args[1];
-    let file = fs::read_to_string(path).unwrap();
+    let file = fs::read_to_string(path).context("File Input")?;
 
     let mut stdout = io::stdout();
     if let Err(e) = main_loop(&stdout, &file) {
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
 
 #[allow(clippy::too_many_lines)]
 fn main_loop(mut stdout: &io::Stdout, file: &str) -> Result<()> {
-    let value: Value = serde_json::from_str(file).unwrap();
+    let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
     // let value = value.as_object().unwrap();
 
     let mut render_data = RenderData::default();
