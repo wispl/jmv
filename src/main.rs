@@ -1,6 +1,7 @@
 use std::{
     env, fs,
     io::{self, Write},
+    string::ToString,
     time::Duration,
 };
 
@@ -88,7 +89,7 @@ fn main() -> Result<()> {
             terminal::LeaveAlternateScreen
         )?;
         terminal::disable_raw_mode()?;
-        println!("Error: {:?}\r", e);
+        println!("Error: {e:?}\r");
     }
 
     Ok(())
@@ -125,7 +126,7 @@ fn main_loop(mut stdout: &io::Stdout, file: &str) -> Result<()> {
                         }
                         Value::Array(arr) => {
                             "[ ".to_owned()
-                                + &arr.first().map(|x| x.to_string()).unwrap_or("".to_owned())
+                                + &arr.first().map_or(String::new(), ToString::to_string)
                                 + " ]"
                         }
                         Value::Bool(val) => val.to_string(),
