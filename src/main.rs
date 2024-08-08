@@ -151,7 +151,7 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             Print(render_data.indexed_str()),
             SetForegroundColor(Color::White)
         )?;
-
+        stdout.queue(cursor::MoveTo(0, 0))?;
         if let Some(index) = render_data.prev_index() {
             queue!(
                 stdout,
@@ -161,6 +161,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
                 SetForegroundColor(Color::White)
             )?;
         }
+
+        if let Some(val) = render_data.indexed_val() {
+            render_keys(stdout, val, 56)?;
+        }
+
         stdout.flush()?;
 
         let event = read()?;
@@ -205,26 +210,6 @@ fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()>
         Value::Object(map) => {
             for k in map.keys() {
                 queue!(stdout,  cursor::MoveToColumn(column), Print(k), cursor::MoveToNextLine(1))?;
-            }
-        },
-        Value::Bool(v) => queue!(stdout, Print(v))?,
-        Value::String(v) => queue!(stdout, Print(v))?,
-        Value::Number(v) => queue!(stdout, Print(v))?,
-        Value::Null => queue!(stdout, Print("null"))?,
-    }
-    Ok(())
-}
-
-fn render_values(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()> {
-    match node {
-        Value::Array(vec) => {
-            for v in vec {
-                queue!(stdout, cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
-            }
-        }
-        Value::Object(map) => {
-            for v in map.values() {
-                queue!(stdout, cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
             }
         },
         Value::Bool(v) => queue!(stdout, Print(v))?,
