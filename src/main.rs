@@ -11,11 +11,9 @@ use serde_json::Value;
 use crossterm::{
     cursor::{self, MoveTo, MoveToColumn, MoveToNextLine},
     event::{poll, read, Event, KeyCode},
-    execute,
-    queue,
-    style::{Print, ResetColor, Color, SetForegroundColor},
-    terminal,
-    QueueableCommand,
+    execute, queue,
+    style::{Color, Print, ResetColor, SetForegroundColor},
+    terminal, QueueableCommand,
 };
 
 struct RenderData<'a> {
@@ -39,7 +37,11 @@ impl<'a> RenderData<'a> {
 
     fn indexed_str(&self) -> String {
         match self.curr_node {
-            Value::Object(map) => map.iter().nth(self.index).map(|(k, _)| k.to_string()).unwrap(),
+            Value::Object(map) => map
+                .iter()
+                .nth(self.index)
+                .map(|(k, _)| k.to_string())
+                .unwrap(),
             Value::Array(_) => self.index.to_string(),
             Value::Bool(v) => v.to_string(),
             Value::String(v) => v.to_owned(),
@@ -56,7 +58,7 @@ impl<'a> RenderData<'a> {
         match self.curr_node {
             Value::Object(map) => map.iter().nth(self.index).map(|(_, v)| v),
             Value::Array(arr) => arr.get(self.index),
-            _ => None
+            _ => None,
         }
     }
 
@@ -137,12 +139,14 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     terminal::enable_raw_mode()?;
 
     loop {
-        queue!(stdout, MoveTo(0, 0), terminal::Clear(terminal::ClearType::All))?;
+        queue!(
+            stdout,
+            MoveTo(0, 0),
+            terminal::Clear(terminal::ClearType::All)
+        )?;
 
-        if let Some(prev) = render_data.prev_node() {
+        if let (Some(prev), Some(index)) = (render_data.prev_node(), render_data.prev_index()) {
             render_keys(stdout, prev, 0)?;
-        }
-        if let Some(index) = render_data.prev_index() {
             queue!(
                 stdout,
                 cursor::MoveTo(0, (*index).try_into().unwrap()),
@@ -211,7 +215,7 @@ fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()>
             for k in map.keys() {
                 queue!(stdout, Print(k), MoveToNextLine(1), MoveToColumn(column))?;
             }
-        },
+        }
         Value::Bool(v) => queue!(stdout, Print(v))?,
         Value::String(v) => queue!(stdout, Print(v))?,
         Value::Number(v) => queue!(stdout, Print(v))?,
@@ -239,4 +243,3 @@ fn node_size(node: &Value) -> usize {
         _ => 1,
     }
 }
-
