@@ -49,6 +49,14 @@ impl<'a> RenderData<'a> {
         }
     }
 
+    fn indexed_val(&self) -> Option<&'a Value> {
+        match self.curr_node {
+            Value::Object(map) => map.iter().nth(self.index).map(|(_, v)| v),
+            Value::Array(arr) => arr.get(self.index),
+            _ => None
+        }
+    }
+
     fn prev_node(&self) -> Option<&&'a Value> {
         self.path.last()
     }
@@ -61,11 +69,14 @@ impl<'a> RenderData<'a> {
         self.index
     }
 
-    fn push_path(&mut self, node: &'a Value) {
-        self.path.push(self.curr_node);
-        self.old_indicies.push(self.index);
-        self.index = 0;
-        self.curr_node = node;
+    fn push_path(&mut self) {
+        if let Some(val) = self.indexed_val() {
+            self.path.push(self.curr_node);
+            self.old_indicies.push(self.index);
+
+            self.index = 0;
+            self.curr_node = val;
+        }
     }
 
     fn pop_path(&mut self) {
@@ -146,12 +157,12 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
         if event == Event::Key(KeyCode::Char('k').into()) {
             render_data.dec_index();
         }
-        // if event == Event::Key(KeyCode::Char('l').into()) {
-        //     render_data.push_path();
-        // }
-        // if event == Event::Key(KeyCode::Char('h').into()) {
-        //     render_data.pop_path();
-        // }
+        if event == Event::Key(KeyCode::Char('l').into()) {
+            render_data.push_path();
+        }
+        if event == Event::Key(KeyCode::Char('h').into()) {
+            render_data.pop_path();
+        }
     }
 
     execute!(
