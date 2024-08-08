@@ -20,7 +20,6 @@ use crossterm::{
 };
 
 struct RenderData<'a> {
-    value: &'a Value,
     curr_node: &'a Value,
     prev_str: String,
     index: usize,
@@ -31,7 +30,6 @@ struct RenderData<'a> {
 impl<'a> RenderData<'a> {
     fn new(value: &'a Value) -> RenderData {
         RenderData {
-            value,
             curr_node: value,
             index: 0,
             prev_str: String::new(),
