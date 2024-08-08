@@ -40,7 +40,7 @@ impl<'a> RenderData<'a> {
 
     fn indexed_str(&self) -> String {
         match self.curr_node {
-            Value::Object(map) => map.iter().nth(self.index).map(|(k, v)| k.to_string()).unwrap(),
+            Value::Object(map) => map.iter().nth(self.index).map(|(k, _)| k.to_string()).unwrap(),
             Value::Array(_) => self.index.to_string(),
             Value::Bool(v) => v.to_string(),
             Value::String(v) => v.to_owned(),
