@@ -18,9 +18,9 @@ use crossterm::{
 
 struct RenderData<'a> {
     curr_node: &'a Value,
-    prev_str: String,
     index: usize,
     old_indicies: Vec<usize>,
+    path_str: Vec<String>,
     path: Vec<&'a Value>,
 }
 
@@ -29,7 +29,7 @@ impl<'a> RenderData<'a> {
         RenderData {
             curr_node: value,
             index: 0,
-            prev_str: String::new(),
+            path_str: Vec::new(),
             old_indicies: Vec::new(),
             path: Vec::new(),
         }
@@ -50,8 +50,8 @@ impl<'a> RenderData<'a> {
         }
     }
 
-    fn prev_str(&self) -> &str {
-        &self.prev_str
+    fn prev_str(&self) -> Option<&str> {
+        self.path_str.last().map(std::string::String::as_str)
     }
 
     fn indexed_val(&self) -> Option<&'a Value> {
@@ -81,9 +81,9 @@ impl<'a> RenderData<'a> {
     fn push_path(&mut self) {
         if let Some(val) = self.indexed_val() {
             self.path.push(self.curr_node);
+            self.path_str.push(self.indexed_str());
             self.old_indicies.push(self.index);
 
-            self.prev_str = self.indexed_str();
             self.index = 0;
             self.curr_node = val;
         }
@@ -93,6 +93,7 @@ impl<'a> RenderData<'a> {
         if !self.path.is_empty() {
             self.index = self.old_indicies.pop().unwrap();
             self.curr_node = self.path.pop().unwrap();
+            self.path_str.pop();
         }
     }
 
@@ -129,7 +130,7 @@ fn main() -> Result<()> {
 
 #[allow(clippy::too_many_lines)]
 fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
-    let (columns, rows) = terminal::size()?;
+    let (columns, _) = terminal::size()?;
     let column_length = columns / 3;
 
     let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
@@ -151,7 +152,7 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
                 stdout,
                 cursor::MoveTo(0, (*index).try_into().unwrap()),
                 SetForegroundColor(Color::Blue),
-                Print(render_data.prev_str()),
+                Print(render_data.prev_str().unwrap()),
                 SetForegroundColor(Color::White)
             )?;
         }
