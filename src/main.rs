@@ -193,13 +193,13 @@ fn render_keys(stdout: &mut io::Stdout, node: &Value, index: usize, column: u16)
 fn render_values(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()> {
     match node {
         Value::Array(vec) => {
-            for v in vec.iter() {
-                queue!(stdout,  cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
+            for v in vec {
+                queue!(stdout, cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
             }
         }
         Value::Object(map) => {
             for v in map.values() {
-                queue!(stdout,  cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
+                queue!(stdout, cursor::MoveToColumn(column), Print(v), cursor::MoveToNextLine(1))?;
             }
         },
         Value::Bool(v) => queue!(stdout, Print(v))?,
