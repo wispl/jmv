@@ -21,18 +21,16 @@ use crossterm::{
 
 struct RenderData<'a> {
     value: &'a Value,
-    prev_node: Option<&'a Value>,
     curr_node: &'a Value,
     index: usize,
     old_indicies: Vec<usize>,
-    path: Vec<String>,
+    path: Vec<&'a Value>,
 }
 
 impl<'a> RenderData<'a> {
     fn new(value: &'a Value) -> RenderData {
         RenderData {
             value,
-            prev_node: None,
             curr_node: value,
             index: 0,
             old_indicies: Vec::new(),
@@ -40,8 +38,19 @@ impl<'a> RenderData<'a> {
         }
     }
 
-    fn prev_node(&self) -> Option<&'a Value> {
-        self.prev_node
+    fn indexed_str(&self) -> String {
+        match self.curr_node {
+            Value::Object(map) => map.iter().nth(self.index).map(|(k, v)| k.to_string()).unwrap(),
+            Value::Array(_) => self.index.to_string(),
+            Value::Bool(v) => v.to_string(),
+            Value::String(v) => v.to_owned(),
+            Value::Number(v) => v.to_string(),
+            Value::Null => "null".to_owned(),
+        }
+    }
+
+    fn prev_node(&self) -> Option<&&'a Value> {
+        self.path.last()
     }
 
     fn curr_node(&self) -> &'a Value {
@@ -52,23 +61,17 @@ impl<'a> RenderData<'a> {
         self.index
     }
 
-    fn path(&self) -> String {
-        if self.path.is_empty() {
-            return String::new();
-        }
-        "/".to_owned() + &self.path.join("/")
-    }
-
-    fn push_path(&mut self) {
+    fn push_path(&mut self, node: &'a Value) {
+        self.path.push(self.curr_node);
         self.old_indicies.push(self.index);
         self.index = 0;
-        // self.path.push(self.current.clone());
+        self.curr_node = node;
     }
 
     fn pop_path(&mut self) {
-        if !self.old_indicies.is_empty() {
-            self.index = self.old_indicies.pop().unwrap_or(0);
-            self.path.pop();
+        if !self.path.is_empty() {
+            self.index = self.old_indicies.pop().unwrap();
+            self.curr_node = self.path.pop().unwrap();
         }
     }
 
@@ -115,10 +118,17 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     loop {
         queue!(stdout, MoveTo(0, 0), terminal::Clear(terminal::ClearType::All))?;
         if let Some(prev) = render_data.prev_node() {
-            render_keys(stdout, prev, 0, 0)?;
+            render_keys(stdout, prev, 0)?;
         }
         stdout.queue(cursor::MoveTo(0, 0))?;
-        render_keys(stdout, render_data.curr_node(), render_data.index(), 24)?;
+        render_keys(stdout, render_data.curr_node(), 24)?;
+        queue!(
+            stdout,
+            cursor::MoveTo(24, render_data.index().try_into().unwrap()),
+            SetForegroundColor(Color::Blue),
+            Print(render_data.indexed_str()),
+            SetForegroundColor(Color::White)
+        )?;
 
         stdout.flush()?;
 
@@ -137,18 +147,10 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             render_data.dec_index();
         }
         // if event == Event::Key(KeyCode::Char('l').into()) {
-            // render_data.push_path();
-            // let path = render_data.path();
-            // node = value
-            //     .pointer(&path)
-            //     .context(format!("invalid path: {path}"))?;
+        //     render_data.push_path();
         // }
         // if event == Event::Key(KeyCode::Char('h').into()) {
-            // render_data.pop_path();
-            // let path = render_data.path();
-            // node = value
-            //     .pointer(&path)
-            //     .context(format!("invalid path: {path}"))?;
+        //     render_data.pop_path();
         // }
     }
 
@@ -162,24 +164,16 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_keys(stdout: &mut io::Stdout, node: &Value, index: usize, column: u16) -> Result<()> {
+fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()> {
     match node {
         Value::Array(vec) => {
             for i in 0..vec.len() {
-                if i == index {
-                    queue!(stdout, SetForegroundColor(Color::Blue))?;
-                }
                 queue!(stdout, MoveToColumn(column), Print(i), MoveToNextLine(1))?;
-                queue!(stdout, SetForegroundColor(Color::White))?;
             }
         }
         Value::Object(map) => {
-            for (i, k) in map.keys().enumerate() {
-                if i == index {
-                    queue!(stdout, SetForegroundColor(Color::Blue))?;
-                }
+            for k in map.keys() {
                 queue!(stdout,  cursor::MoveToColumn(column), Print(k), cursor::MoveToNextLine(1))?;
-                queue!(stdout, SetForegroundColor(Color::White))?;
             }
         },
         Value::Bool(v) => queue!(stdout, Print(v))?,
