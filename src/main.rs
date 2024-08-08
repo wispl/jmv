@@ -142,8 +142,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
         if let Some(prev) = render_data.prev_node() {
             render_keys(stdout, prev, 0)?;
         }
-        stdout.queue(cursor::MoveTo(0, 0))?;
         render_keys(stdout, render_data.curr_node(), 24)?;
+        if let Some(val) = render_data.indexed_val() {
+            render_keys(stdout, val, 56)?;
+        }
+
         queue!(
             stdout,
             cursor::MoveTo(24, render_data.index().try_into().unwrap()),
@@ -151,7 +154,6 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             Print(render_data.indexed_str()),
             SetForegroundColor(Color::White)
         )?;
-        stdout.queue(cursor::MoveTo(0, 0))?;
         if let Some(index) = render_data.prev_index() {
             queue!(
                 stdout,
@@ -162,9 +164,6 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             )?;
         }
 
-        if let Some(val) = render_data.indexed_val() {
-            render_keys(stdout, val, 56)?;
-        }
 
         stdout.flush()?;
 
@@ -201,15 +200,16 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
 }
 
 fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()> {
+    stdout.queue(cursor::MoveTo(column, 0))?;
     match node {
         Value::Array(vec) => {
             for i in 0..vec.len() {
-                queue!(stdout, MoveToColumn(column), Print(i), MoveToNextLine(1))?;
+                queue!(stdout, Print(i), MoveToNextLine(1), MoveToColumn(column))?;
             }
         }
         Value::Object(map) => {
             for k in map.keys() {
-                queue!(stdout,  cursor::MoveToColumn(column), Print(k), cursor::MoveToNextLine(1))?;
+                queue!(stdout, Print(k), MoveToNextLine(1), MoveToColumn(column))?;
             }
         },
         Value::Bool(v) => queue!(stdout, Print(v))?,
