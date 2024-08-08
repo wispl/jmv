@@ -22,6 +22,7 @@ use crossterm::{
 struct RenderData<'a> {
     value: &'a Value,
     curr_node: &'a Value,
+    prev_str: String,
     index: usize,
     old_indicies: Vec<usize>,
     path: Vec<&'a Value>,
@@ -33,6 +34,7 @@ impl<'a> RenderData<'a> {
             value,
             curr_node: value,
             index: 0,
+            prev_str: String::new(),
             old_indicies: Vec::new(),
             path: Vec::new(),
         }
@@ -47,6 +49,10 @@ impl<'a> RenderData<'a> {
             Value::Number(v) => v.to_string(),
             Value::Null => "null".to_owned(),
         }
+    }
+
+    fn prev_str(&self) -> &str {
+        &self.prev_str
     }
 
     fn indexed_val(&self) -> Option<&'a Value> {
@@ -69,11 +75,16 @@ impl<'a> RenderData<'a> {
         self.index
     }
 
+    fn prev_index(&self) -> Option<&usize> {
+        self.old_indicies.last()
+    }
+
     fn push_path(&mut self) {
         if let Some(val) = self.indexed_val() {
             self.path.push(self.curr_node);
             self.old_indicies.push(self.index);
 
+            self.prev_str = self.indexed_str();
             self.index = 0;
             self.curr_node = val;
         }
@@ -141,6 +152,15 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             SetForegroundColor(Color::White)
         )?;
 
+        if let Some(index) = render_data.prev_index() {
+            queue!(
+                stdout,
+                cursor::MoveTo(0, (*index).try_into().unwrap()),
+                SetForegroundColor(Color::Blue),
+                Print(render_data.prev_str()),
+                SetForegroundColor(Color::White)
+            )?;
+        }
         stdout.flush()?;
 
         let event = read()?;
