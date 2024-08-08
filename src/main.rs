@@ -15,7 +15,6 @@ use crossterm::{
     queue,
     style::{Print, ResetColor, Color, SetForegroundColor},
     terminal,
-    // ExecutableCommand,
     QueueableCommand,
 };
 
@@ -128,7 +127,9 @@ fn main() -> Result<()> {
 
 #[allow(clippy::too_many_lines)]
 fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
-    // let (columns, rows) = terminal::size()?;
+    let (columns, rows) = terminal::size()?;
+    let column_length = columns / 3;
+
     let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
     let mut render_data = RenderData::new(&value);
 
@@ -137,21 +138,10 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
 
     loop {
         queue!(stdout, MoveTo(0, 0), terminal::Clear(terminal::ClearType::All))?;
+
         if let Some(prev) = render_data.prev_node() {
             render_keys(stdout, prev, 0)?;
         }
-        render_keys(stdout, render_data.curr_node(), 24)?;
-        if let Some(val) = render_data.indexed_val() {
-            render_keys(stdout, val, 56)?;
-        }
-
-        queue!(
-            stdout,
-            cursor::MoveTo(24, render_data.index().try_into().unwrap()),
-            SetForegroundColor(Color::Blue),
-            Print(render_data.indexed_str()),
-            SetForegroundColor(Color::White)
-        )?;
         if let Some(index) = render_data.prev_index() {
             queue!(
                 stdout,
@@ -162,6 +152,18 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             )?;
         }
 
+        render_keys(stdout, render_data.curr_node(), column_length)?;
+        queue!(
+            stdout,
+            cursor::MoveTo(column_length, render_data.index().try_into().unwrap()),
+            SetForegroundColor(Color::Blue),
+            Print(render_data.indexed_str()),
+            SetForegroundColor(Color::White)
+        )?;
+
+        if let Some(val) = render_data.indexed_val() {
+            render_keys(stdout, val, column_length * 2)?;
+        }
 
         stdout.flush()?;
 
