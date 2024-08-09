@@ -59,10 +59,7 @@ impl<'a> RenderData<'a> {
                 .map(|(k, _)| k.to_string())
                 .unwrap(),
             Value::Array(_) => self.index.to_string(),
-            Value::Bool(v) => v.to_string(),
-            Value::String(v) => v.to_owned(),
-            Value::Number(v) => v.to_string(),
-            Value::Null => "null".to_owned(),
+            _ => node_string(self.curr_node)
         }
     }
 
@@ -298,7 +295,6 @@ fn node_size(node: &Value) -> usize {
     match node {
         Value::Object(map) => map.len(),
         Value::Array(arr) => arr.len(),
-        Value::Null => 0,
         _ => 1,
     }
 }
