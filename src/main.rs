@@ -16,23 +16,39 @@ use crossterm::{
     terminal, QueueableCommand,
 };
 
+enum Side {
+    Left,
+    Middle,
+    Right,
+}
+
 struct RenderData<'a> {
     curr_node: &'a Value,
     index: usize,
     old_indicies: Vec<usize>,
     path_str: Vec<String>,
     path: Vec<&'a Value>,
+    size: (u16, u16),
 }
 
 impl<'a> RenderData<'a> {
-    fn new(value: &'a Value) -> RenderData {
+    fn new(value: &'a Value, size: (u16, u16)) -> RenderData {
         RenderData {
             curr_node: value,
             index: 0,
+            size: size,
             path_str: Vec::new(),
             old_indicies: Vec::new(),
             path: Vec::new(),
         }
+    }
+
+    fn size(&self) -> (u16, u16) {
+        self.size
+    }
+
+    fn resize(&mut self, size: (u16, u16)) {
+        self.size = size;
     }
 
     fn indexed_str(&self) -> String {
@@ -62,8 +78,8 @@ impl<'a> RenderData<'a> {
         }
     }
 
-    fn prev_node(&self) -> Option<&&'a Value> {
-        self.path.last()
+    fn prev_node(&self) -> Option<&'a Value> {
+        self.path.last().map(|x| *x)
     }
 
     fn curr_node(&self) -> &'a Value {
@@ -130,11 +146,10 @@ fn main() -> Result<()> {
 
 #[allow(clippy::too_many_lines)]
 fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
-    let (columns, _) = terminal::size()?;
-    let column_length = columns / 3;
-
+    let (column, row) = terminal::size()?;
+    let column_length = column / 3;
     let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
-    let mut render_data = RenderData::new(&value);
+    let mut render_data = RenderData::new(&value, terminal::size()?);
 
     execute!(stdout, cursor::Hide, terminal::EnterAlternateScreen)?;
     terminal::enable_raw_mode()?;
@@ -146,17 +161,14 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             terminal::Clear(terminal::ClearType::All)
         )?;
 
-        if let (Some(prev), Some(index)) = (render_data.prev_node(), render_data.prev_index()) {
-            render_keys(stdout, prev, 0)?;
+        if let Some(index) = render_data.prev_index() {
             render_highlight(stdout, render_data.prev_str().unwrap(), column_length, (0, (*index).try_into().unwrap()))?;
         }
 
-        render_keys(stdout, render_data.curr_node(), column_length)?;
+        render_col(stdout, &render_data, Side::Left)?;
+        render_col(stdout, &render_data, Side::Middle)?;
         render_highlight(stdout, &render_data.indexed_str(), column_length, (column_length, render_data.index().try_into().unwrap()))?;
-
-        if let Some(val) = render_data.indexed_val() {
-            render_keys(stdout, val, column_length * 2)?;
-        }
+        render_col(stdout, &render_data, Side::Right)?;
 
         stdout.flush()?;
 
@@ -192,23 +204,39 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()> {
+fn render_col(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> Result<()> {
+    let node = match side {
+        Side::Left => render_data.prev_node(),
+        Side::Middle => Some(render_data.curr_node()),
+        Side::Right => render_data.indexed_val(),
+    };
+
+    let (cols, _) = render_data.size();
+    let cols = cols / 3;
+    let column = match side {
+        Side::Left => 0,
+        Side::Middle => cols,
+        Side::Right => cols * 2
+    };
+
     stdout.queue(cursor::MoveTo(column, 0))?;
-    match node {
-        Value::Array(vec) => {
-            for i in 0..vec.len() {
-                queue!(stdout, Print(i), MoveToNextLine(1), MoveToColumn(column))?;
+    if let Some(node) = node {
+        match node {
+            Value::Array(vec) => {
+                for i in 0..vec.len() {
+                    queue!(stdout, Print(i), MoveToNextLine(1), MoveToColumn(column))?;
+                }
             }
-        }
-        Value::Object(map) => {
-            for k in map.keys() {
-                queue!(stdout, Print(k), MoveToNextLine(1), MoveToColumn(column))?;
+            Value::Object(map) => {
+                for k in map.keys() {
+                    queue!(stdout, Print(k), MoveToNextLine(1), MoveToColumn(column))?;
+                }
             }
+            Value::Bool(v) => queue!(stdout, Print(v))?,
+            Value::String(v) => queue!(stdout, Print(v))?,
+            Value::Number(v) => queue!(stdout, Print(v))?,
+            Value::Null => queue!(stdout, Print("null"))?,
         }
-        Value::Bool(v) => queue!(stdout, Print(v))?,
-        Value::String(v) => queue!(stdout, Print(v))?,
-        Value::Number(v) => queue!(stdout, Print(v))?,
-        Value::Null => queue!(stdout, Print("null"))?,
     }
     Ok(())
 }
