@@ -146,8 +146,6 @@ fn main() -> Result<()> {
 
 #[allow(clippy::too_many_lines)]
 fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
-    let (column, row) = terminal::size()?;
-    let column_length = column / 3;
     let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
     let mut render_data = RenderData::new(&value, terminal::size()?);
 
@@ -161,14 +159,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             terminal::Clear(terminal::ClearType::All)
         )?;
 
-        if let Some(index) = render_data.prev_index() {
-            render_highlight(stdout, render_data.prev_str().unwrap(), column_length, (0, (*index).try_into().unwrap()))?;
-        }
-
         render_col(stdout, &render_data, Side::Left)?;
         render_col(stdout, &render_data, Side::Middle)?;
-        render_highlight(stdout, &render_data.indexed_str(), column_length, (column_length, render_data.index().try_into().unwrap()))?;
         render_col(stdout, &render_data, Side::Right)?;
+        render_highlight(stdout, &render_data, Side::Left)?;
+        render_highlight(stdout, &render_data, Side::Middle)?;
 
         stdout.flush()?;
 
@@ -241,15 +236,37 @@ fn render_col(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> 
     Ok(())
 }
 
-fn render_highlight(stdout: &mut io::Stdout, str: &str, width: u16, coord: (u16, u16)) -> Result<()> {
-    queue!(
-        stdout,
-        cursor::MoveTo(coord.0, coord.1),
-        SetBackgroundColor(Color::DarkBlue),
-        SetForegroundColor(Color::Black),
-        Print(pad_string(str, width.into())),
-        ResetColor,
-    )?;
+fn render_highlight(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> Result<()> {
+    let (cols, _) = render_data.size();
+    let cols = cols / 3;
+    let column = match side {
+        Side::Left => 0,
+        Side::Middle => cols,
+        Side::Right => cols * 2
+    };
+    let row = match side {
+        Side::Left => render_data.prev_index().map(|x| (*x).try_into().unwrap()),
+        Side::Middle => Some(render_data.index().try_into().unwrap()),
+        Side::Right => None,
+    };
+    let tmp = render_data.indexed_str();
+    let str = match side {
+        Side::Left => render_data.prev_str(),
+        Side::Middle => Some(tmp.as_str()),
+        Side::Right => None,
+    };
+
+    if let (column, Some(row), Some(str)) = (column, row, str) {
+        queue!(
+            stdout,
+            cursor::MoveTo(column, row),
+            SetBackgroundColor(Color::DarkBlue),
+            SetForegroundColor(Color::Black),
+            Print(pad_string(str, cols.into())),
+            ResetColor,
+        )?;
+    }
+
     Ok(())
 }
 
