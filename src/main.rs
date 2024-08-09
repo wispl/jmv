@@ -148,11 +148,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
 
         if let (Some(prev), Some(index)) = (render_data.prev_node(), render_data.prev_index()) {
             render_keys(stdout, prev, 0)?;
-            render_highlight(stdout, render_data.prev_str().unwrap(), 0, (0, (*index).try_into().unwrap()))?;
+            render_highlight(stdout, render_data.prev_str().unwrap(), column_length, (0, (*index).try_into().unwrap()))?;
         }
 
         render_keys(stdout, render_data.curr_node(), column_length)?;
-        render_highlight(stdout, &render_data.indexed_str(), 0, (column_length, render_data.index().try_into().unwrap()))?;
+        render_highlight(stdout, &render_data.indexed_str(), column_length, (column_length, render_data.index().try_into().unwrap()))?;
 
         if let Some(val) = render_data.indexed_val() {
             render_keys(stdout, val, column_length * 2)?;
@@ -219,10 +219,15 @@ fn render_highlight(stdout: &mut io::Stdout, str: &str, width: u16, coord: (u16,
         cursor::MoveTo(coord.0, coord.1),
         SetBackgroundColor(Color::DarkBlue),
         SetForegroundColor(Color::Black),
-        Print(str),
+        Print(pad_string(str, width.into())),
         ResetColor,
     )?;
     Ok(())
+}
+
+fn pad_string(str: &str, width: usize) -> String {
+    let width = width - 4;
+    format!(" {:width$} ", str)
 }
 
 fn flush_resize_events(first_resize: (u16, u16)) -> ((u16, u16), (u16, u16)) {
