@@ -12,7 +12,7 @@ use crossterm::{
     cursor::{self, MoveTo, MoveToColumn, MoveToNextLine},
     event::{poll, read, Event, KeyCode},
     execute, queue,
-    style::{Color, Print, ResetColor, SetForegroundColor, SetBackgroundColor},
+    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal, QueueableCommand,
 };
 
@@ -211,7 +211,7 @@ fn render_col(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> 
     let column = match side {
         Side::Left => 0,
         Side::Middle => cols,
-        Side::Right => cols * 2
+        Side::Right => cols * 2,
     };
 
     stdout.queue(cursor::MoveTo(column, 0))?;
@@ -219,18 +219,25 @@ fn render_col(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> 
         match node {
             Value::Array(vec) => {
                 for i in 0..vec.len() {
-                    queue!(stdout, Print(i), MoveToNextLine(1), MoveToColumn(column))?;
+                    queue!(
+                        stdout,
+                        Print(pad_string(&i.to_string(), cols.into())),
+                        MoveToNextLine(1),
+                        MoveToColumn(column)
+                    )?;
                 }
             }
             Value::Object(map) => {
                 for k in map.keys() {
-                    queue!(stdout, Print(k), MoveToNextLine(1), MoveToColumn(column))?;
+                    queue!(
+                        stdout,
+                        Print(pad_string(k, cols.into())),
+                        MoveToNextLine(1),
+                        MoveToColumn(column)
+                    )?;
                 }
             }
-            Value::Bool(v) => queue!(stdout, Print(v))?,
-            Value::String(v) => queue!(stdout, Print(v))?,
-            Value::Number(v) => queue!(stdout, Print(v))?,
-            Value::Null => queue!(stdout, Print("null"))?,
+            _ => queue!(stdout, Print(pad_string(&node_string(node), cols.into())))?,
         }
     }
     Ok(())
@@ -242,7 +249,7 @@ fn render_highlight(stdout: &mut io::Stdout, render_data: &RenderData, side: Sid
     let column = match side {
         Side::Left => 0,
         Side::Middle => cols,
-        Side::Right => cols * 2
+        Side::Right => cols * 2,
     };
     let row = match side {
         Side::Left => render_data.prev_index().map(|x| (*x).try_into().unwrap()),
@@ -292,5 +299,15 @@ fn node_size(node: &Value) -> usize {
         Value::Array(arr) => arr.len(),
         Value::Null => 0,
         _ => 1,
+    }
+}
+
+fn node_string(node: &Value) -> String {
+    match node {
+        Value::Bool(v) => v.to_string(),
+        Value::String(v) => v.to_owned(),
+        Value::Number(v) => v.to_string(),
+        Value::Null => "null".to_owned(),
+        _ => "".to_owned(),
     }
 }
