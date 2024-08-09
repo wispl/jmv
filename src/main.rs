@@ -169,7 +169,8 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
 
         let event = read()?;
         if let Event::Resize(x, y) = event {
-            let (_original_size, _new_size) = flush_resize_events((x, y));
+            let (_, new_size) = flush_resize_events((x, y));
+            render_data.resize(new_size);
         }
 
         if event == Event::Key(KeyCode::Char('q').into()) {
