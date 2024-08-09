@@ -12,7 +12,7 @@ use crossterm::{
     cursor::{self, MoveTo, MoveToColumn, MoveToNextLine},
     event::{poll, read, Event, KeyCode},
     execute, queue,
-    style::{Color, Print, ResetColor, SetForegroundColor},
+    style::{Color, Print, ResetColor, SetForegroundColor, SetBackgroundColor},
     terminal, QueueableCommand,
 };
 
@@ -148,23 +148,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
 
         if let (Some(prev), Some(index)) = (render_data.prev_node(), render_data.prev_index()) {
             render_keys(stdout, prev, 0)?;
-            queue!(
-                stdout,
-                cursor::MoveTo(0, (*index).try_into().unwrap()),
-                SetForegroundColor(Color::Blue),
-                Print(render_data.prev_str().unwrap()),
-                SetForegroundColor(Color::White)
-            )?;
+            render_highlight(stdout, render_data.prev_str().unwrap(), 0, (0, (*index).try_into().unwrap()))?;
         }
 
         render_keys(stdout, render_data.curr_node(), column_length)?;
-        queue!(
-            stdout,
-            cursor::MoveTo(column_length, render_data.index().try_into().unwrap()),
-            SetForegroundColor(Color::Blue),
-            Print(render_data.indexed_str()),
-            SetForegroundColor(Color::White)
-        )?;
+        render_highlight(stdout, &render_data.indexed_str(), 0, (column_length, render_data.index().try_into().unwrap()))?;
 
         if let Some(val) = render_data.indexed_val() {
             render_keys(stdout, val, column_length * 2)?;
@@ -222,6 +210,18 @@ fn render_keys(stdout: &mut io::Stdout, node: &Value, column: u16) -> Result<()>
         Value::Number(v) => queue!(stdout, Print(v))?,
         Value::Null => queue!(stdout, Print("null"))?,
     }
+    Ok(())
+}
+
+fn render_highlight(stdout: &mut io::Stdout, str: &str, width: u16, coord: (u16, u16)) -> Result<()> {
+    queue!(
+        stdout,
+        cursor::MoveTo(coord.0, coord.1),
+        SetBackgroundColor(Color::DarkBlue),
+        SetForegroundColor(Color::Black),
+        Print(str),
+        ResetColor,
+    )?;
     Ok(())
 }
 
