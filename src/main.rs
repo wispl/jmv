@@ -16,110 +16,9 @@ use crossterm::{
     terminal, QueueableCommand,
 };
 
-enum Side {
-    Left,
-    Middle,
-    Right,
-}
+use crate::state::{ProgramState, PanelSide, PanelState};
 
-struct RenderData<'a> {
-    curr_node: &'a Value,
-    index: usize,
-    old_indicies: Vec<usize>,
-    path_str: Vec<String>,
-    path: Vec<&'a Value>,
-    size: (u16, u16),
-}
-
-impl<'a> RenderData<'a> {
-    fn new(value: &'a Value, size: (u16, u16)) -> RenderData {
-        RenderData {
-            curr_node: value,
-            index: 0,
-            size: size,
-            path_str: Vec::new(),
-            old_indicies: Vec::new(),
-            path: Vec::new(),
-        }
-    }
-
-    fn size(&self) -> (u16, u16) {
-        self.size
-    }
-
-    fn resize(&mut self, size: (u16, u16)) {
-        self.size = size;
-    }
-
-    fn indexed_str(&self) -> String {
-        match self.curr_node {
-            Value::Object(map) => map
-                .iter()
-                .nth(self.index)
-                .map(|(k, _)| k.to_string())
-                .unwrap(),
-            Value::Array(_) => self.index.to_string(),
-            _ => node_string(self.curr_node)
-        }
-    }
-
-    fn prev_str(&self) -> Option<&str> {
-        self.path_str.last().map(std::string::String::as_str)
-    }
-
-    fn indexed_val(&self) -> Option<&'a Value> {
-        match self.curr_node {
-            Value::Object(map) => map.iter().nth(self.index).map(|(_, v)| v),
-            Value::Array(arr) => arr.get(self.index),
-            _ => None,
-        }
-    }
-
-    fn prev_node(&self) -> Option<&'a Value> {
-        self.path.last().map(|x| *x)
-    }
-
-    fn curr_node(&self) -> &'a Value {
-        self.curr_node
-    }
-
-    fn index(&self) -> usize {
-        self.index
-    }
-
-    fn prev_index(&self) -> Option<&usize> {
-        self.old_indicies.last()
-    }
-
-    fn push_path(&mut self) {
-        if let Some(val) = self.indexed_val() {
-            self.path.push(self.curr_node);
-            self.path_str.push(self.indexed_str());
-            self.old_indicies.push(self.index);
-
-            self.index = 0;
-            self.curr_node = val;
-        }
-    }
-
-    fn pop_path(&mut self) {
-        if !self.path.is_empty() {
-            self.index = self.old_indicies.pop().unwrap();
-            self.curr_node = self.path.pop().unwrap();
-            self.path_str.pop();
-        }
-    }
-
-    fn inc_index(&mut self) {
-        if self.index < node_size(self.curr_node) - 1 {
-            self.index += 1;
-        }
-    }
-
-    fn dec_index(&mut self) {
-        self.index = self.index.saturating_sub(1);
-    }
-}
+mod state;
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -144,7 +43,7 @@ fn main() -> Result<()> {
 #[allow(clippy::too_many_lines)]
 fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     let value: Value = serde_json::from_str(file).context("Json Deserialization")?;
-    let mut render_data = RenderData::new(&value, terminal::size()?);
+    let mut program_state = ProgramState::new(&value, terminal::size()?);
 
     execute!(stdout, cursor::Hide, terminal::EnterAlternateScreen)?;
     terminal::enable_raw_mode()?;
@@ -156,34 +55,40 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
             terminal::Clear(terminal::ClearType::All)
         )?;
 
-        render_col(stdout, &render_data, Side::Left)?;
-        render_col(stdout, &render_data, Side::Middle)?;
-        render_col(stdout, &render_data, Side::Right)?;
-        render_highlight(stdout, &render_data, Side::Left)?;
-        render_highlight(stdout, &render_data, Side::Middle)?;
+        if let Some(left) = program_state.panel_state(PanelSide::Left) {
+            render_col(stdout, &left)?;
+            render_highlight(stdout, &left)?;
+        }
+        if let Some(middle) = program_state.panel_state(PanelSide::Middle) {
+            render_col(stdout, &middle)?;
+            render_highlight(stdout, &middle)?;
+        }
+        if let Some(right) = program_state.panel_state(PanelSide::Right) {
+            render_col(stdout, &right)?;
+        }
 
         stdout.flush()?;
 
         let event = read()?;
         if let Event::Resize(x, y) = event {
             let (_, new_size) = flush_resize_events((x, y));
-            render_data.resize(new_size);
+            program_state.resize(new_size);
         }
 
         if event == Event::Key(KeyCode::Char('q').into()) {
             break;
         }
         if event == Event::Key(KeyCode::Char('j').into()) {
-            render_data.inc_index();
+            program_state.inc_index();
         }
         if event == Event::Key(KeyCode::Char('k').into()) {
-            render_data.dec_index();
+            program_state.dec_index();
         }
         if event == Event::Key(KeyCode::Char('l').into()) {
-            render_data.push_path();
+            program_state.push_path();
         }
         if event == Event::Key(KeyCode::Char('h').into()) {
-            render_data.pop_path();
+            program_state.pop_path();
         }
     }
 
@@ -197,81 +102,46 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
     Ok(())
 }
 
-fn render_col(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> Result<()> {
-    let node = match side {
-        Side::Left => render_data.prev_node(),
-        Side::Middle => Some(render_data.curr_node()),
-        Side::Right => render_data.indexed_val(),
-    };
-
-    let (cols, _) = render_data.size();
-    let cols = cols / 3;
-    let column = match side {
-        Side::Left => 0,
-        Side::Middle => cols,
-        Side::Right => cols * 2,
-    };
+fn render_col(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
+    let column = panel_state.column();
+    let width = panel_state.width();
 
     stdout.queue(cursor::MoveTo(column, 0))?;
-    if let Some(node) = node {
-        match node {
-            Value::Array(vec) => {
-                for i in 0..vec.len() {
-                    queue!(
-                        stdout,
-                        Print(pad_string(&i.to_string(), cols.into())),
-                        MoveToNextLine(1),
-                        MoveToColumn(column)
-                    )?;
-                }
+    match panel_state.value() {
+        Value::Array(vec) => {
+            for i in 0..vec.len() {
+                queue!(
+                    stdout,
+                    Print(pad_string(&i.to_string(), width.into())),
+                    MoveToNextLine(1),
+                    MoveToColumn(column)
+                )?;
             }
-            Value::Object(map) => {
-                for k in map.keys() {
-                    queue!(
-                        stdout,
-                        Print(pad_string(k, cols.into())),
-                        MoveToNextLine(1),
-                        MoveToColumn(column)
-                    )?;
-                }
-            }
-            _ => queue!(stdout, Print(pad_string(&node_string(node), cols.into())))?,
         }
+        Value::Object(map) => {
+            for k in map.keys() {
+                queue!(
+                    stdout,
+                    Print(pad_string(k, width.into())),
+                    MoveToNextLine(1),
+                    MoveToColumn(column)
+                )?;
+            }
+        }
+        _ => queue!(stdout, Print(pad_string(&panel_state.text(), width.into())))?,
     }
     Ok(())
 }
 
-fn render_highlight(stdout: &mut io::Stdout, render_data: &RenderData, side: Side) -> Result<()> {
-    let (cols, _) = render_data.size();
-    let cols = cols / 3;
-    let column = match side {
-        Side::Left => 0,
-        Side::Middle => cols,
-        Side::Right => cols * 2,
-    };
-    let row = match side {
-        Side::Left => render_data.prev_index().map(|x| (*x).try_into().unwrap()),
-        Side::Middle => Some(render_data.index().try_into().unwrap()),
-        Side::Right => None,
-    };
-    let tmp = render_data.indexed_str();
-    let str = match side {
-        Side::Left => render_data.prev_str(),
-        Side::Middle => Some(tmp.as_str()),
-        Side::Right => None,
-    };
-
-    if let (column, Some(row), Some(str)) = (column, row, str) {
-        queue!(
-            stdout,
-            cursor::MoveTo(column, row),
-            SetBackgroundColor(Color::DarkBlue),
-            SetForegroundColor(Color::Black),
-            Print(pad_string(str, cols.into())),
-            ResetColor,
-        )?;
-    }
-
+fn render_highlight(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
+    queue!(
+        stdout,
+        cursor::MoveTo(panel_state.column(), panel_state.index()),
+        SetBackgroundColor(Color::DarkBlue),
+        SetForegroundColor(Color::Black),
+        Print(pad_string(panel_state.text(), panel_state.width().into())),
+        ResetColor,
+    )?;
     Ok(())
 }
 
@@ -289,22 +159,4 @@ fn flush_resize_events(first_resize: (u16, u16)) -> ((u16, u16), (u16, u16)) {
     }
 
     (first_resize, last_resize)
-}
-
-fn node_size(node: &Value) -> usize {
-    match node {
-        Value::Object(map) => map.len(),
-        Value::Array(arr) => arr.len(),
-        _ => 1,
-    }
-}
-
-fn node_string(node: &Value) -> String {
-    match node {
-        Value::Bool(v) => v.to_string(),
-        Value::String(v) => v.to_owned(),
-        Value::Number(v) => v.to_string(),
-        Value::Null => "null".to_owned(),
-        _ => "".to_owned(),
-    }
 }
