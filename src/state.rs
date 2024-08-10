@@ -58,6 +58,10 @@ impl<'a> ProgramState<'a> {
         }
     }
 
+    pub fn path_string(&self) -> String {
+        self.paths.join("/") + "/" + &get_value_key(self.value, self.index)
+    }
+
     pub fn panel_state(&self, panel_side: PanelSide) -> Option<PanelState> {
         let (cols, _) = self.size;
         let width = cols / 3;

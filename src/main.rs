@@ -52,9 +52,11 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
         queue!(
             stdout,
             MoveTo(0, 0),
-            terminal::Clear(terminal::ClearType::All)
+            terminal::Clear(terminal::ClearType::All),
+            SetForegroundColor(Color::DarkGreen),
+            Print(program_state.path_string()),
+            ResetColor,
         )?;
-
         if let Some(left) = program_state.panel_state(PanelSide::Left) {
             render_col(stdout, &left)?;
             render_highlight(stdout, &left)?;
@@ -107,7 +109,7 @@ fn render_col(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
     let column = panel_state.column();
     let width = panel_state.width();
 
-    stdout.queue(cursor::MoveTo(column, 0))?;
+    stdout.queue(cursor::MoveTo(column, 1))?;
     match panel_state.value() {
         Value::Array(vec) => {
             for i in 0..vec.len() {
@@ -137,7 +139,7 @@ fn render_col(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
 fn render_highlight(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
     queue!(
         stdout,
-        cursor::MoveTo(panel_state.column(), panel_state.index()),
+        cursor::MoveTo(panel_state.column(), panel_state.index() + 1),
         SetBackgroundColor(Color::DarkBlue),
         SetForegroundColor(Color::Black),
         Print(pad_string(panel_state.text(), panel_state.width().into())),
