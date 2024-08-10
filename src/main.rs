@@ -65,6 +65,7 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
         }
         if let Some(right) = program_state.panel_state(PanelSide::Right) {
             render_col(stdout, &right)?;
+            render_highlight(stdout, &right)?;
         }
 
         stdout.flush()?;
