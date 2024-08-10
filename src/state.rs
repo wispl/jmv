@@ -1,5 +1,6 @@
 use serde_json::Value;
 
+#[derive(Copy, Clone)]
 pub enum PanelSide {
     Left,
     Middle,
@@ -76,22 +77,22 @@ impl<'a> ProgramState<'a> {
         let value = match panel_side {
             PanelSide::Left => self.values.last()?,
             PanelSide::Middle => self.value,
-            PanelSide::Right => {
-                match self.value {
-                    Value::Object(map) => map.values().nth(self.index)?,
-                    Value::Array(arr) => arr.get(self.index)?,
-                    _ => return None,
-                }
-            }
+            PanelSide::Right => match self.value {
+                Value::Object(map) => map.values().nth(self.index)?,
+                Value::Array(arr) => arr.get(self.index)?,
+                _ => return None,
+            },
         };
 
-        let text = get_value_key(&value, index);
+        let text = get_value_key(value, index);
 
-        Some(PanelState { value, text, column, width, index: index.try_into().unwrap() })
-    }
-
-    pub fn size(&self) -> (u16, u16) {
-        self.size
+        Some(PanelState {
+            value,
+            text,
+            column,
+            width,
+            index: index.try_into().unwrap(),
+        })
     }
 
     pub fn resize(&mut self, size: (u16, u16)) {
@@ -112,7 +113,7 @@ impl<'a> ProgramState<'a> {
             self.index = 0;
             self.value = val;
 
-            let text = get_value_key(&val, self.index);
+            let text = get_value_key(val, self.index);
             self.paths.push(text);
         }
     }

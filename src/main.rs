@@ -16,7 +16,7 @@ use crossterm::{
     terminal, QueueableCommand,
 };
 
-use crate::state::{ProgramState, PanelSide, PanelState};
+use crate::state::{PanelSide, PanelState, ProgramState};
 
 mod state;
 
@@ -129,7 +129,7 @@ fn render_col(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result<()> {
                 )?;
             }
         }
-        _ => queue!(stdout, Print(pad_string(&panel_state.text(), width.into())))?,
+        _ => queue!(stdout, Print(pad_string(panel_state.text(), width.into())))?,
     }
     Ok(())
 }
@@ -148,7 +148,7 @@ fn render_highlight(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result
 
 fn pad_string(str: &str, width: usize) -> String {
     let width = width - 4;
-    format!(" {:width$} ", str)
+    format!(" {str:width$} ")
 }
 
 fn flush_resize_events(first_resize: (u16, u16)) -> ((u16, u16), (u16, u16)) {
