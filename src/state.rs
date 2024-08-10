@@ -109,12 +109,11 @@ impl<'a> ProgramState<'a> {
         if let Some(val) = value {
             self.indices.push(self.index);
             self.values.push(self.value);
+            let text = get_value_key(self.value, self.index);
+            self.paths.push(text);
 
             self.index = 0;
             self.value = val;
-
-            let text = get_value_key(val, self.index);
-            self.paths.push(text);
         }
     }
 
