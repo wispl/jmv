@@ -150,6 +150,12 @@ fn render_highlight(stdout: &mut io::Stdout, panel_state: &PanelState) -> Result
 
 fn pad_string(str: &str, width: usize) -> String {
     let width = width - 4;
+    if str.len() > width {
+        let mut str = str.to_owned();
+        str.truncate(width - 1);
+        str += "~";
+        return format!(" {str:width$} ")
+    }
     format!(" {str:width$} ")
 }
 
