@@ -59,7 +59,12 @@ impl<'a> ProgramState<'a> {
     }
 
     pub fn path_string(&self) -> String {
-        self.paths.join("/") + "/" + &get_value_key(self.value, self.index)
+        let base = if self.paths.len() > 6 {
+            ".../".to_owned() + &self.paths.last_chunk::<6>().unwrap().join("/")
+        } else {
+            self.paths.join("/")
+        };
+        base + "/" + &get_value_key(self.value, self.index)
     }
 
     pub fn panel_state(&self, panel_side: PanelSide) -> Option<PanelState> {
