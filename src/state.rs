@@ -104,6 +104,10 @@ impl<'a> ProgramState<'a> {
         })
     }
 
+    pub fn size(&self) -> (u16, u16) {
+        self.size
+    }
+
     pub fn resize(&mut self, size: (u16, u16)) {
         self.size = size;
     }

@@ -64,6 +64,18 @@ fn main_loop(stdout: &mut io::Stdout, file: &str) -> Result<()> {
         if let Some(middle) = program_state.panel_state(PanelSide::Middle) {
             render_col(stdout, &middle)?;
             render_highlight(stdout, &middle)?;
+            let count = match middle.value() {
+                Value::Object(map) => map.len(),
+                Value::Array(arr) => arr.len(),
+                _ => 1
+            };
+            let (x, y) = program_state.size();
+            let msg = format!("{}/{}", middle.index() + 1, count);
+            queue!(
+                stdout,
+                cursor::MoveTo(x - u16::try_from(msg.len()).unwrap(), y),
+                Print(msg)
+            )?;
         }
         if let Some(right) = program_state.panel_state(PanelSide::Right) {
             render_col(stdout, &right)?;
@@ -154,7 +166,7 @@ fn pad_string(str: &str, width: usize) -> String {
         let mut str = str.to_owned();
         str.truncate(width - 1);
         str += "~";
-        return format!(" {str:width$} ")
+        return format!(" {str:width$} ");
     }
     format!(" {str:width$} ")
 }
